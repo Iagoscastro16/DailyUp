@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="DailyUp">
+  <meta name="theme-color" content="#0f0f0f">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+  <title>DailyUp</title>
+</head>
+<body>
+  <div id="app">
+
+    <header class="header">
+      <h1 id="page-title">Hoje</h1>
+      <span id="today-date"></span>
+    </header>
+
+    <main id="main">
+
+      <!-- Tela: Hoje -->
+      <section id="screen-hoje" class="screen active">
+        <div id="routines-today"></div>
+        <div id="empty-today" class="empty-state hidden">
+          <p>Nenhuma rotina ativa.</p>
+          <p>Crie uma na aba Rotinas.</p>
+        </div>
+      </section>
+
+      <!-- Tela: Rotinas -->
+      <section id="screen-rotinas" class="screen">
+        <div id="routines-list"></div>
+        <div id="empty-routines" class="empty-state hidden">
+          <p>Nenhuma rotina criada ainda.</p>
+        </div>
+        <button id="btn-new-routine" class="btn-primary">+ Nova Rotina</button>
+      </section>
+
+    </main>
+
+    <nav class="bottom-nav">
+      <button class="nav-btn active" data-screen="hoje">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 17h7M17 14v7"/></svg>
+        <span>Hoje</span>
+      </button>
+      <button class="nav-btn" data-screen="rotinas">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        <span>Rotinas</span>
+      </button>
+    </nav>
+
+  </div>
+
+  <!-- Modal: Nova/Editar Rotina -->
+  <div id="modal-backdrop" class="modal-backdrop hidden">
+    <div id="modal-routine" class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h2 id="modal-title">Nova Rotina</h2>
+        <button id="modal-close" class="btn-icon">✕</button>
+      </div>
+      <input type="text" id="routine-name-input" placeholder="Nome da rotina" class="input-field">
+      <div id="routine-items-list"></div>
+      <button id="btn-add-item" class="btn-secondary">+ Adicionar passo</button>
+      <div class="modal-footer">
+        <button id="btn-delete-routine" class="btn-danger hidden">Excluir rotina</button>
+        <button id="btn-save-routine" class="btn-primary">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

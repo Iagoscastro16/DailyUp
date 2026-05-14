@@ -1,0 +1,301 @@
+// ── Persistência ──
+
+const DB = {
+  getRoutines() {
+    return JSON.parse(localStorage.getItem('routines') || '[]');
+  },
+  saveRoutines(routines) {
+    localStorage.setItem('routines', JSON.stringify(routines));
+  },
+  todayKey() {
+    return new Date().toISOString().slice(0, 10);
+  },
+  getTodayCompletions() {
+    const all = JSON.parse(localStorage.getItem('completions') || '{}');
+    return all[this.todayKey()] || {};
+  },
+  toggleItem(itemId) {
+    const all = JSON.parse(localStorage.getItem('completions') || '{}');
+    const key = this.todayKey();
+    if (!all[key]) all[key] = {};
+    if (all[key][itemId]) {
+      delete all[key][itemId];
+    } else {
+      all[key][itemId] = true;
+    }
+    localStorage.setItem('completions', JSON.stringify(all));
+  },
+};
+
+// ── Navegação ──
+
+function navigate(screen) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`screen-${screen}`).classList.add('active');
+  document.querySelector(`[data-screen="${screen}"]`).classList.add('active');
+  document.getElementById('page-title').textContent = screen === 'hoje' ? 'Hoje' : 'Rotinas';
+  if (screen === 'hoje') renderToday();
+  if (screen === 'rotinas') renderRoutines();
+}
+
+// ── Tela: Hoje ──
+
+function renderToday() {
+  const routines = DB.getRoutines().filter(r => r.active && r.items && r.items.length > 0);
+  const completions = DB.getTodayCompletions();
+  const container = document.getElementById('routines-today');
+  const empty = document.getElementById('empty-today');
+
+  if (routines.length === 0) {
+    container.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+
+  empty.classList.add('hidden');
+
+  container.innerHTML = routines.map(routine => {
+    const items = [...routine.items].sort((a, b) => {
+      if (!a.time && !b.time) return 0;
+      if (!a.time) return 1;
+      if (!b.time) return -1;
+      return a.time.localeCompare(b.time);
+    });
+    const done = items.filter(i => completions[i.id]).length;
+    const total = items.length;
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    const complete = done === total;
+
+    return `
+      <div class="routine-card">
+        <div class="routine-card-header">
+          <span class="routine-name">${esc(routine.name)}</span>
+          <span class="routine-progress-text">${done}/${total}</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill ${complete ? 'complete' : ''}" style="width:${pct}%"></div>
+        </div>
+        <div>
+          ${items.map(item => {
+            const checked = !!completions[item.id];
+            return `
+              <div class="routine-item" data-item-id="${item.id}">
+                <div class="item-checkbox ${checked ? 'checked' : ''}">
+                  <span class="check-icon">✓</span>
+                </div>
+                ${item.time ? `<span class="item-time">${item.time}</span>` : ''}
+                <span class="item-label ${checked ? 'done' : ''}">${esc(item.name)}</span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  container.querySelectorAll('.routine-item').forEach(el => {
+    el.addEventListener('click', () => {
+      DB.toggleItem(el.dataset.itemId);
+      renderToday();
+    });
+  });
+}
+
+// ── Tela: Rotinas ──
+
+function renderRoutines() {
+  const routines = DB.getRoutines();
+  const container = document.getElementById('routines-list');
+  const empty = document.getElementById('empty-routines');
+
+  if (routines.length === 0) {
+    container.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+
+  empty.classList.add('hidden');
+
+  container.innerHTML = routines.map(routine => {
+    const count = (routine.items || []).length;
+    return `
+      <div class="routine-manage-card">
+        <div class="routine-manage-header">
+          <div class="routine-manage-info routine-manage-tap" data-id="${routine.id}">
+            <div class="routine-manage-name">${esc(routine.name)}</div>
+            <div class="routine-manage-count">${count} passo${count !== 1 ? 's' : ''}</div>
+          </div>
+          <span class="routine-chevron routine-manage-tap" data-id="${routine.id}">›</span>
+          <div class="toggle ${routine.active ? 'on' : ''}" data-id="${routine.id}">
+            <div class="toggle-knob"></div>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  container.querySelectorAll('.toggle').forEach(el => {
+    el.addEventListener('click', () => {
+      const routines = DB.getRoutines();
+      const r = routines.find(r => r.id === el.dataset.id);
+      if (r) {
+        r.active = !r.active;
+        DB.saveRoutines(routines);
+        renderRoutines();
+      }
+    });
+  });
+
+  container.querySelectorAll('.routine-manage-tap').forEach(el => {
+    el.addEventListener('click', () => openModal(el.dataset.id));
+  });
+}
+
+// ── Modal ──
+
+let editingId = null;
+
+function openModal(routineId = null) {
+  editingId = routineId;
+  const nameInput = document.getElementById('routine-name-input');
+  const titleEl = document.getElementById('modal-title');
+  const deleteBtn = document.getElementById('btn-delete-routine');
+
+  if (routineId) {
+    const routine = DB.getRoutines().find(r => r.id === routineId);
+    titleEl.textContent = 'Editar Rotina';
+    nameInput.value = routine.name;
+    renderModalItems(routine.items || []);
+    deleteBtn.classList.remove('hidden');
+  } else {
+    titleEl.textContent = 'Nova Rotina';
+    nameInput.value = '';
+    renderModalItems([]);
+    deleteBtn.classList.add('hidden');
+  }
+
+  document.getElementById('modal-backdrop').classList.remove('hidden');
+  setTimeout(() => nameInput.focus(), 100);
+}
+
+function closeModal() {
+  document.getElementById('modal-backdrop').classList.add('hidden');
+  editingId = null;
+}
+
+function renderModalItems(items) {
+  const container = document.getElementById('routine-items-list');
+  container.innerHTML = '';
+  items.forEach(item => addModalItemRow(item.name, item.id, item.time || ''));
+}
+
+function currentTime() {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+}
+
+function addModalItemRow(name = '', id = null, time = '') {
+  const container = document.getElementById('routine-items-list');
+  const itemId = id || generateId();
+  const row = document.createElement('div');
+  row.className = 'modal-item-row';
+  row.dataset.id = itemId;
+  row.innerHTML = `
+    <input type="text" class="input-field item-name" placeholder="Nome do passo" value="${esc(name)}">
+    <input type="time" class="input-time" value="${time}" placeholder="${currentTime()}">
+    <button class="btn-remove" title="Remover">✕</button>
+  `;
+  row.querySelector('.btn-remove').addEventListener('click', () => row.remove());
+  container.appendChild(row);
+  return row;
+}
+
+function saveRoutine() {
+  const name = document.getElementById('routine-name-input').value.trim();
+  if (!name) {
+    document.getElementById('routine-name-input').focus();
+    return;
+  }
+
+  const rows = document.querySelectorAll('#routine-items-list .modal-item-row');
+  const items = [...rows]
+    .map(row => ({
+      id: row.dataset.id,
+      name: row.querySelector('.item-name').value.trim(),
+      time: row.querySelector('.input-time').value || '',
+    }))
+    .filter(item => item.name);
+
+  const routines = DB.getRoutines();
+
+  if (editingId) {
+    const idx = routines.findIndex(r => r.id === editingId);
+    routines[idx].name = name;
+    routines[idx].items = items;
+  } else {
+    routines.push({ id: generateId(), name, active: true, items });
+  }
+
+  DB.saveRoutines(routines);
+  closeModal();
+  renderRoutines();
+}
+
+function deleteRoutine() {
+  if (!editingId) return;
+  if (!confirm('Excluir esta rotina?')) return;
+  const routines = DB.getRoutines().filter(r => r.id !== editingId);
+  DB.saveRoutines(routines);
+  closeModal();
+  renderRoutines();
+}
+
+// ── Utilitários ──
+
+function generateId() {
+  return Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
+}
+
+function esc(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function formatDate(date) {
+  return date.toLocaleDateString('pt-BR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
+}
+
+// ── Init ──
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('today-date').textContent = formatDate(new Date());
+
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => navigate(btn.dataset.screen));
+  });
+
+  document.getElementById('btn-new-routine').addEventListener('click', () => openModal());
+
+  document.getElementById('btn-add-item').addEventListener('click', () => {
+    const row = addModalItemRow();
+    row.querySelector('input').focus();
+  });
+
+  document.getElementById('btn-save-routine').addEventListener('click', saveRoutine);
+  document.getElementById('btn-delete-routine').addEventListener('click', deleteRoutine);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+
+  document.getElementById('modal-backdrop').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeModal();
+  });
+
+  renderToday();
+});
