@@ -2,7 +2,7 @@
   "name": "DailyUp",
   "short_name": "DailyUp",
   "description": "Rotinas e tempo do dia",
-  "start_url": "/",
+  "start_url": "/DailyUp/",
   "display": "standalone",
   "background_color": "#0f0f0f",
   "theme_color": "#0f0f0f",
