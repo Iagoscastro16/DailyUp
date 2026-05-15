@@ -1,3 +1,82 @@
+// ── Configurações ──
+
+const Settings = {
+  get() {
+    return JSON.parse(localStorage.getItem('settings') || '{"notifyBefore":10}');
+  },
+  save(data) {
+    localStorage.setItem('settings', JSON.stringify(data));
+  },
+};
+
+// ── Notificações ──
+
+async function setupNotifications() {
+  if (!('serviceWorker' in navigator) || !('Notification' in window)) return;
+  try {
+    await navigator.serviceWorker.register('./sw.js');
+  } catch (e) { return; }
+  if (Notification.permission === 'default') {
+    await Notification.requestPermission();
+  }
+  scheduleNotifications();
+}
+
+function scheduleNotifications() {
+  if (Notification.permission !== 'granted') return;
+  const { notifyBefore: defaultBefore } = Settings.get();
+  if (defaultBefore === 0) return;
+
+  const today = new Date().getDay();
+  const now = new Date();
+
+  DB.getRoutines()
+    .filter(r => r.active && r.items?.length > 0 && (!r.days || r.days.includes(today)))
+    .forEach(routine => {
+      routine.items.forEach(item => {
+        if (!item.time) return;
+        const mins = item.notifyBefore != null ? item.notifyBefore : defaultBefore;
+        if (mins === 0) return;
+
+        const [h, m] = item.time.split(':').map(Number);
+        const fireAt = new Date();
+        fireAt.setHours(h, m - mins, 0, 0);
+
+        const delay = fireAt - now;
+        if (delay <= 0) return;
+
+        setTimeout(async () => {
+          const reg = await navigator.serviceWorker.ready;
+          reg.showNotification('DailyUp', {
+            body: `${item.name} em ${mins} min`,
+            icon: './icon-192.png',
+            tag: item.id,
+            renotify: true,
+          });
+        }, delay);
+      });
+    });
+}
+
+// ── Configurações: modal ──
+
+function openSettings() {
+  const { notifyBefore } = Settings.get();
+  document.getElementById('settings-notify-before').value = notifyBefore ?? 10;
+  document.getElementById('settings-backdrop').classList.add('visible');
+}
+
+function closeSettings() {
+  document.getElementById('settings-backdrop').classList.remove('visible');
+}
+
+function saveSettings() {
+  const val = parseInt(document.getElementById('settings-notify-before').value);
+  Settings.save({ notifyBefore: isNaN(val) ? 10 : Math.max(0, val) });
+  closeSettings();
+  scheduleNotifications();
+}
+
 // ── Persistência ──
 
 const DB = {
@@ -247,7 +326,7 @@ function getSelectedDays() {
 function renderModalItems(items) {
   const container = document.getElementById('routine-items-list');
   container.innerHTML = '';
-  items.forEach(item => addModalItemRow(item.name, item.id, item.time || ''));
+  items.forEach(item => addModalItemRow(item.name, item.id, item.time || '', item.notifyBefore ?? ''));
 }
 
 function currentTime() {
@@ -255,7 +334,7 @@ function currentTime() {
   return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 }
 
-function addModalItemRow(name = '', id = null, time = '') {
+function addModalItemRow(name = '', id = null, time = '', notifyBefore = '') {
   const container = document.getElementById('routine-items-list');
   const itemId = id || generateId();
   const row = document.createElement('div');
@@ -263,7 +342,8 @@ function addModalItemRow(name = '', id = null, time = '') {
   row.dataset.id = itemId;
   row.innerHTML = `
     <input type="text" class="input-field item-name" placeholder="Nome do passo" value="${esc(name)}">
-    <input type="time" class="input-time" value="${time}" placeholder="${currentTime()}">
+    <input type="time" class="input-time" value="${time}">
+    <input type="number" class="input-notify" min="0" max="120" placeholder="—" value="${notifyBefore}">
     <button class="btn-remove" title="Remover">✕</button>
   `;
   row.querySelector('.btn-remove').addEventListener('click', () => row.remove());
@@ -280,11 +360,15 @@ function saveRoutine() {
 
   const rows = document.querySelectorAll('#routine-items-list .modal-item-row');
   const items = [...rows]
-    .map(row => ({
-      id: row.dataset.id,
-      name: row.querySelector('.item-name').value.trim(),
-      time: row.querySelector('.input-time').value || '',
-    }))
+    .map(row => {
+      const notify = row.querySelector('.input-notify').value;
+      return {
+        id: row.dataset.id,
+        name: row.querySelector('.item-name').value.trim(),
+        time: row.querySelector('.input-time').value || '',
+        notifyBefore: notify !== '' ? Math.max(0, parseInt(notify)) : null,
+      };
+    })
     .filter(item => item.name);
 
   const routines = DB.getRoutines();
@@ -364,5 +448,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target === e.currentTarget) closeModal();
   });
 
+  document.getElementById('btn-settings').addEventListener('click', openSettings);
+  document.getElementById('settings-close').addEventListener('click', closeSettings);
+  document.getElementById('btn-save-settings').addEventListener('click', saveSettings);
+  document.getElementById('settings-backdrop').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeSettings();
+  });
+
+  setupNotifications();
   renderToday();
 });
