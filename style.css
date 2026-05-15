@@ -440,6 +440,31 @@ html, body {
 .input-field:focus { border-color: var(--accent); }
 .input-field::placeholder { color: var(--text-muted); }
 
+.day-picker {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.day-btn {
+  flex: 1;
+  padding: 8px 0;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.day-btn.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
 .modal-items-list { margin-top: 8px; }
 
 .modal-item-row {

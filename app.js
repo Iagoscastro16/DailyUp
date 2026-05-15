@@ -42,7 +42,11 @@ function navigate(screen) {
 // ── Tela: Hoje ──
 
 function renderToday() {
-  const routines = DB.getRoutines().filter(r => r.active && r.items && r.items.length > 0);
+  const today = new Date().getDay();
+  const routines = DB.getRoutines().filter(r =>
+    r.active && r.items && r.items.length > 0 &&
+    (!r.days || r.days.length === 0 || r.days.includes(today))
+  );
   const completions = DB.getTodayCompletions();
   const container = document.getElementById('routines-today');
   const empty = document.getElementById('empty-today');
@@ -158,12 +162,15 @@ function renderRoutines() {
 
   container.innerHTML = routines.map(routine => {
     const count = (routine.items || []).length;
+    const dayNames = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+    const days = routine.days ?? [0,1,2,3,4,5,6];
+    const daysLabel = days.length === 7 ? 'Todos os dias' : days.map(d => dayNames[d]).join(', ');
     return `
       <div class="routine-manage-card">
         <div class="routine-manage-header">
           <div class="routine-manage-info routine-manage-tap" data-id="${routine.id}">
             <div class="routine-manage-name">${esc(routine.name)}</div>
-            <div class="routine-manage-count">${count} passo${count !== 1 ? 's' : ''}</div>
+            <div class="routine-manage-count">${count} passo${count !== 1 ? 's' : ''} · ${daysLabel}</div>
           </div>
           <span class="routine-chevron routine-manage-tap" data-id="${routine.id}">›</span>
           <div class="toggle ${routine.active ? 'on' : ''}" data-id="${routine.id}">
@@ -205,11 +212,13 @@ function openModal(routineId = null) {
     const routine = DB.getRoutines().find(r => r.id === routineId);
     titleEl.textContent = 'Editar Rotina';
     nameInput.value = routine.name;
+    setDayPicker(routine.days ?? [0,1,2,3,4,5,6]);
     renderModalItems(routine.items || []);
     deleteBtn.classList.remove('hidden');
   } else {
     titleEl.textContent = 'Nova Rotina';
     nameInput.value = '';
+    setDayPicker([0,1,2,3,4,5,6]);
     renderModalItems([]);
     deleteBtn.classList.add('hidden');
   }
@@ -223,6 +232,16 @@ function closeModal() {
   const backdrop = document.getElementById('modal-backdrop');
   backdrop.classList.remove('visible');
   editingId = null;
+}
+
+function setDayPicker(days) {
+  document.querySelectorAll('.day-btn').forEach(btn => {
+    btn.classList.toggle('on', days.includes(parseInt(btn.dataset.day)));
+  });
+}
+
+function getSelectedDays() {
+  return [...document.querySelectorAll('.day-btn.on')].map(b => parseInt(b.dataset.day));
 }
 
 function renderModalItems(items) {
@@ -270,12 +289,15 @@ function saveRoutine() {
 
   const routines = DB.getRoutines();
 
+  const days = getSelectedDays();
+
   if (editingId) {
     const idx = routines.findIndex(r => r.id === editingId);
     routines[idx].name = name;
     routines[idx].items = items;
+    routines[idx].days = days;
   } else {
-    routines.push({ id: generateId(), name, active: true, items });
+    routines.push({ id: generateId(), name, active: true, items, days });
   }
 
   DB.saveRoutines(routines);
@@ -328,6 +350,10 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-add-item').addEventListener('click', () => {
     const row = addModalItemRow();
     row.querySelector('input').focus();
+  });
+
+  document.querySelectorAll('.day-btn').forEach(btn => {
+    btn.addEventListener('click', () => btn.classList.toggle('on'));
   });
 
   document.getElementById('btn-save-routine').addEventListener('click', saveRoutine);
