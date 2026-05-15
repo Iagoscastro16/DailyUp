@@ -66,10 +66,20 @@ html, body {
   overflow-y: auto;
   padding: 16px 16px calc(var(--nav-h) + 20px);
   -webkit-overflow-scrolling: touch;
+  display: grid;
 }
 
-.screen { display: none; }
-.screen.active { display: block; }
+.screen {
+  grid-area: 1 / 1;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.screen.active {
+  opacity: 1;
+  pointer-events: auto;
+}
 
 /* ── Bottom Nav ── */
 
@@ -148,7 +158,8 @@ html, body {
   height: 100%;
   background: var(--accent);
   border-radius: 2px;
-  transition: width 0.3s ease;
+  transition: width 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+              background 0.3s ease;
 }
 
 .progress-fill.complete { background: var(--success); }
@@ -178,9 +189,16 @@ html, body {
   transition: background 0.15s, border-color 0.15s;
 }
 
+@keyframes check-pop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
 .item-checkbox.checked {
   background: var(--success);
   border-color: var(--success);
+  animation: check-pop 0.2s ease;
 }
 
 .check-icon {
@@ -356,9 +374,15 @@ html, body {
   display: flex;
   align-items: flex-end;
   justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
 }
 
-.modal-backdrop.hidden { display: none; }
+.modal-backdrop.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
 
 .modal-sheet {
   background: var(--bg-card);
@@ -369,6 +393,12 @@ html, body {
   max-height: 88vh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  transform: translateY(100%);
+  transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.modal-backdrop.visible .modal-sheet {
+  transform: translateY(0);
 }
 
 .modal-handle {

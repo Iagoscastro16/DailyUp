@@ -68,13 +68,13 @@ function renderToday() {
     const complete = done === total;
 
     return `
-      <div class="routine-card">
+      <div class="routine-card" data-routine-id="${routine.id}">
         <div class="routine-card-header">
           <span class="routine-name">${esc(routine.name)}</span>
           <span class="routine-progress-text">${done}/${total}</span>
         </div>
         <div class="progress-bar">
-          <div class="progress-fill ${complete ? 'complete' : ''}" style="width:${pct}%"></div>
+          <div class="progress-fill ${complete ? 'complete' : ''}" style="width:0%" data-pct="${pct}"></div>
         </div>
         <div>
           ${items.map(item => {
@@ -94,12 +94,51 @@ function renderToday() {
     `;
   }).join('');
 
-  container.querySelectorAll('.routine-item').forEach(el => {
-    el.addEventListener('click', () => {
-      DB.toggleItem(el.dataset.itemId);
-      renderToday();
+  // Anima barras do zero até o valor real no render inicial
+  requestAnimationFrame(() => {
+    container.querySelectorAll('.progress-fill').forEach(el => {
+      el.style.width = el.dataset.pct + '%';
     });
   });
+
+  container.querySelectorAll('.routine-item').forEach(el => {
+    el.addEventListener('click', () => handleItemToggle(el.dataset.itemId));
+  });
+}
+
+function handleItemToggle(itemId) {
+  DB.toggleItem(itemId);
+  const completions = DB.getTodayCompletions();
+
+  const itemEl = document.querySelector(`.routine-item[data-item-id="${itemId}"]`);
+  if (!itemEl) return;
+
+  const card = itemEl.closest('.routine-card');
+  const routineId = card.dataset.routineId;
+  const routine = DB.getRoutines().find(r => r.id === routineId);
+  const isChecked = !!completions[itemId];
+
+  // Atualiza checkbox com re-trigger da animação
+  const checkbox = itemEl.querySelector('.item-checkbox');
+  if (isChecked) {
+    checkbox.classList.remove('checked');
+    void checkbox.offsetWidth;
+    checkbox.classList.add('checked');
+  } else {
+    checkbox.classList.remove('checked');
+  }
+  itemEl.querySelector('.item-label').classList.toggle('done', isChecked);
+
+  // Atualiza barra de progresso
+  const items = routine.items;
+  const done = items.filter(i => completions[i.id]).length;
+  const total = items.length;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  const complete = done === total;
+
+  card.querySelector('.progress-fill').style.width = pct + '%';
+  card.querySelector('.progress-fill').classList.toggle('complete', complete);
+  card.querySelector('.routine-progress-text').textContent = `${done}/${total}`;
 }
 
 // ── Tela: Rotinas ──
@@ -175,12 +214,14 @@ function openModal(routineId = null) {
     deleteBtn.classList.add('hidden');
   }
 
-  document.getElementById('modal-backdrop').classList.remove('hidden');
+  const backdrop = document.getElementById('modal-backdrop');
+  backdrop.classList.add('visible');
   setTimeout(() => nameInput.focus(), 100);
 }
 
 function closeModal() {
-  document.getElementById('modal-backdrop').classList.add('hidden');
+  const backdrop = document.getElementById('modal-backdrop');
+  backdrop.classList.remove('visible');
   editingId = null;
 }
 
